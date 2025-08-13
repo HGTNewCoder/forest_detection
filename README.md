@@ -1,15 +1,6 @@
 # Satellite Image Processing for Land Cover Classification
 
-This project outlines the workflow for downloading and preprocessing Sentinel-1 satellite imagery to generate training data for a machine learning model.
-
-***
-
-## 📋 Table of Contents
-1. [Data Acquisition](#-data-acquisition)
-2. [Preprocessing](#-preprocessing)
-3. [Mask Generation](#-mask-generation)
-
-***
+This project outlines the workflow for downloading and preprocessing Sentinel-1 satellite imagery to generate training data for a machine learning model.                                                      
 
 ## 🛰️ 1. Data Acquisition
 
