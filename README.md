@@ -105,6 +105,10 @@ forest_detection/
 
 ## Data and preprocessing
 
+The dataset consists of dual-polarized Sentinel-1 SAR imagery (VV and VH) acquired over the Mawas region between 2020 and 2023. Ground truth masks for illegal logging are manually annotated based on time-series inspection of canopy disturbance, corroborated by expert validation and auxiliary optical imagery. All SAR scenes are preprocessed using terrain correction, speckle filtering, and radiometric calibration. VV and VH channels are stacked and normalized to form the input tensor.
+
+To improve model robustness, data augmentation includes random rotations, flips, elastic deformations, and intensity scaling. Patches are extracted at 512×512 resolution with overlap to preserve edge continuity. The dataset is split into training, validation, and test sets using spatial stratification to prevent leakage across temporally adjacent scenes.
+
 - **Area:** ~750 km² within Mawas Conservation Area, Central Kalimantan, Indonesia  
 - **Sensor/mode:** Sentinel‑1 IW swath; 250 km swath; 5m × 20m resolution  
 - **Polarizations:** VV, VH, and VV/VH ratio  
@@ -114,6 +118,11 @@ forest_detection/
 ---
 
 ## Model architecture
+
+
+The segmentation model integrates a DeepLabV3 encoder with an EfficientNet-B4 backbone and a UNet-style decoder enhanced by Spatial and Channel Squeeze & Excitation (SCSE) attention modules. This hybrid architecture is designed to balance semantic richness with spatial precision, enabling accurate delineation of logging-induced canopy disturbance from noisy SAR backscatter signals. The SCSE blocks improve feature recalibration by adaptively weighting spatial and channel-wise information, which is particularly beneficial in low-contrast, high-variability peatland imagery.
+
+The model is trained using a pixel-wise binary cross-entropy loss with class weighting to address severe foreground-background imbalance. Optimization is performed using AdamW with cosine annealing learning rate scheduling. Batch normalization and dropout are employed to improve generalization across seasonal and hydrological variability.
 
 - **Encoder:** DeepLabV3 with EfficientNet‑B4 backbone (ImageNet pretrained)  
 - **ASPP:** Multi-dilation aggregation  
@@ -125,6 +134,8 @@ forest_detection/
 ---
 
 ## Training & evaluation
+
+The model is trained for 100 epochs with early stopping based on validation IoU. Evaluation metrics include pixel-wise accuracy, F1 score, precision, recall, and mean Intersection over Union (mIoU). Ablation studies are conducted to assess the impact of SCSE attention, backbone depth, and polarization channel combinations. Results demonstrate that the proposed architecture outperforms baseline UNet and DeepLabV3 models, particularly in detecting small and fragmented logging patches.
 
 ```bash
 python train.py \
