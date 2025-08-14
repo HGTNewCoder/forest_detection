@@ -188,11 +188,11 @@ Use `scripts/visualize.py` to overlay predictions on SAR inputs.
 
 This project is based on the research presented in:
 
-- **Thinh Ha** – Beaver Works Summer Institute, Anaheim Discovery Christian School  
-- **Tanish Khanna** – Beaver Works Summer Institute, La Jolla Country Day School  
-- **Naga Kasam** – Beaver Works Summer Institute, Dr. Ronald E McNair Academic High School  
-- **Arush Shangari** – Beaver Works Summer Institute, St. John's Preparatory School  
-- **Ruhaan Arya** – Beaver Works Summer Institute, The Village School  
-- **Ikshit Gupta** – Beaver Works Summer Institute, Mountain House High School  
+- **Thinh Ha** – Beaver Works Summer Institute  
+- **Tanish Khanna** – Beaver Works Summer Institute  
+- **Naga Kasam** – Beaver Works Summer Institute
+- **Ruhaan Arya** – Beaver Works Summer Institute 
+- **Arush Shangari** – Beaver Works Summer Institute   
+- **Ikshit Gupta** – Beaver Works Summer Institute
 
 Special thanks to Mr. Scheele (MIT Lincoln Lab), Mr. Amriche (SUNY), and Dr. Xiao (MIT Lincoln Lab) for their guidance, and to the Sentinel‑1/Copernicus program for providing SAR data.
