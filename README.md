@@ -1,88 +1,187 @@
-# Satellite Image Processing for Land Cover Classification
+# Detecting illegal logging on Sentinel-1 SAR with DeepLabV3-UNet
 
-This project outlines the workflow for downloading and preprocessing Sentinel-1 satellite imagery to generate training data for a machine learning model.                                                      
+This repository implements a deep-learning pipeline to detect illegal logging in the Mawas Conservation Area (Central Kalimantan, Indonesia) using Sentinel‑1 SAR imagery. It combines a DeepLabV3 encoder with an EfficientNet‑B4 backbone and a UNet-style decoder enhanced by SCSE attention. The model is trained for binary semantic segmentation of illegal logging vs. background on tiled VH, VV, and VV/VH input bands. Results in the paper report F1 ≈ 0.656 and IoU ≈ 0.488, demonstrating strong potential for operational monitoring with further refinement.
 
-## 🛰️ 1. Data Acquisition
+---
 
-Follow these steps to download the required Sentinel-1 images from the [Copernicus Open Access Hub](https://scihub.copernicus.eu/).
+## Quick start
 
-* **Navigate to Data Collections and select the following:**
-    * **Collection:** Sentinel-1
-    * **Acquisition Mode:** IW - Interferometric Wide Swath (10m x 10m)
-    * **Polarization:** `VV` + `VH`
+> If your local repo structure or filenames differ, adapt the paths below. This README reflects the paper and standard deep-learning project patterns.
 
-* **Define Area of Interest (AOI):**
-    * Upload the provided `area_of_interest.zip` file to define the geographical boundaries for the image search.
+```bash
+# 1) Clone
+git clone https://github.com/HGTNewCoder/forest_detection.git
+cd forest_detection
 
-* **Select Acquisition Dates:**
-    * Set the time interval to include the following dates:
-        * `2015-03-29`
-        * `2015-04-22`
-        * `2015-05-16`
-        * `2015-07-27`
-        * `2015-09-13`
-        * `2015-10-07`
-        * `2015-11-24`
-        * `2015-12-18`
-        * `2016-01-11`
-        * `2016-02-04`
-        * `2016-02-28`
-        * `2016-03-23`
-        * `2016-04-16`
-        * `2016-05-10`
-        * `2016-06-03`
-        * `2016-06-27`
-        * `2016-07-21`
-        * `2016-08-14`
+# 2) Create environment
+conda create -n forest-detect python=3.10 -y
+conda activate forest-detect
 
-* **Download Image Settings:**
-    * In the download options, select the **Analytical** tab and configure the following:
-        * **Image Format:** TIFF (16-bit)
-        * **Image Resolution:** High
-        * **Coordinate System:** WGS 84 (EPSG:4326)
-        * **Bands:** Select both `VH - decibel gamma()` and `VV - decibel gamma()`
+# 3) Install dependencies
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121   # or CPU index-url
+pip install segmentation-models-pytorch efficientnet-pytorch
+pip install albumentations opencv-python numpy scipy
+pip install rasterio shapely geopandas pyproj
+pip install scikit-image scikit-learn tqdm pyyaml
+pip install matplotlib seaborn
 
-***
+# 4) Organize data
+# data/raw/  (SAR VV, VH, ratio)
+# data/labels/ (binary masks)
 
-## 🖼️ 2. Preprocessing
+# 5) Preprocess
+python scripts/preprocess.py \
+  --input_dir data/raw \
+  --label_dir data/labels \
+  --output_dir data/tiles \
+  --crop_size 2464 \
+  --tile_size 382 \
+  --bands VV,VH,RATIO \
+  --val_split 0.2 \
+  --filter_tiles 15
 
-Once all images are downloaded, preprocess them to create standardized training tiles.
+# 6) Train
+python train.py \
+  --data_dir data/tiles \
+  --epochs 450 \
+  --batch_size 8 \
+  --lr 3e-4 \
+  --max_lr 1e-3 \
+  --weight_decay 1e-5 \
+  --loss focal_tversky \
+  --focal_alpha 0.6 --focal_gamma 2.0 \
+  --tversky_alpha 0.4 --tversky_beta 0.6 \
+  --amp \
+  --save_dir outputs/run_01
 
-1.  **Organize Files:**
-    * Extract all downloaded `.tif` files into a single folder named `downloaded_copernicus_image`.
+# 7) Evaluate
+python eval.py \
+  --model_ckpt outputs/run_01/best.ckpt \
+  --data_dir data/tiles/val \
+  --threshold 0.5
 
-2.  **Reconstruct Directories:**
-    * Run the script to organize the raw images into a structured directory format.
-    ```bash
-    python data_preprocessing/directory_reconstruction.py
-    ```
+# 8) Inference on a new scene
+python infer.py \
+  --scene_path data/raw/S1_scene.tif \
+  --model_ckpt outputs/run_01/best.ckpt \
+  --bands VV,VH,RATIO \
+  --tile_size 382 \
+  --overlap 32 \
+  --threshold 0.5 \
+  --out_raster outputs/run_01/pred_illegal_logging.tif
+```
 
-3.  **Verify Image Resolution:**
-    * Run the checker script to ensure all images have a consistent resolution of **2483 x 2500** pixels.
-    ```bash
-    python image_resolution_checker.py
-    ```
+---
 
-4.  **Generate Training Tiles:**
-    * Run the resizing and cropping script to generate smaller image tiles from the full-resolution images. These tiles will be used for model training.
-    ```bash
-    python image_resizing_cropping.py
-    ```
+## Project structure
 
-***
+```
+forest_detection/
+├─ README.md
+├─ train.py
+├─ eval.py
+├─ infer.py
+├─ models/
+│  ├─ deeplab_unet_scse.py
+│  ├─ backbones.py
+│  ├─ losses.py
+│  └─ utils.py
+├─ data/
+│  ├─ raw/
+│  ├─ labels/
+│  └─ tiles/
+├─ scripts/
+│  ├─ preprocess.py
+│  └─ visualize.py
+├─ cfg/
+│  └─ default.yaml
+├─ outputs/
+│  └─ run_01/
+├─ requirements.txt
+└─ LICENSE
+```
 
-## 🎭 3. Mask Generation
+---
 
-The final step is to generate the corresponding masks for the training tiles.
+## Data and preprocessing
 
-1.  **Generate Grayscale Masks:**
-    * Run the script to create the single-channel grayscale masks required for training.
-    ```bash
-    python mask_generation.py
-    ```
+- **Area:** ~750 km² within Mawas Conservation Area, Central Kalimantan, Indonesia  
+- **Sensor/mode:** Sentinel‑1 IW swath; 250 km swath; 5m × 20m resolution  
+- **Polarizations:** VV, VH, and VV/VH ratio  
+- **Temporal span:** Mar 2015 – Dec 2016 (23 scenes)  
+- **Preprocessing:** Crop to 2464×2464, tile to 382×382, filter tiles to balance classes, normalize bands, augment (rotation, flips, brightness/contrast, Gaussian noise, coarse dropout)
 
-2.  **(Optional) Generate RGB Masks:**
-    * If you need a visual representation of the masks for review, run this script to generate a 3-channel RGB version.
-    ```bash
-    python mask_rgb_generation.py
-    ```
+---
+
+## Model architecture
+
+- **Encoder:** DeepLabV3 with EfficientNet‑B4 backbone (ImageNet pretrained)  
+- **ASPP:** Multi-dilation aggregation  
+- **Decoder:** UNet style with skip connections  
+- **Attention:** SCSE blocks  
+- **Loss:** 0.6 × Focal loss (γ=2.0, α=0.6) + 0.4 × Tversky loss (α=0.4, β=0.6)  
+- **Optimizer:** Adam with OneCycleLR, AMP enabled  
+
+---
+
+## Training & evaluation
+
+```bash
+python train.py \
+  --data_dir data/tiles \
+  --epochs 450 --batch_size 8 \
+  --lr 3e-4 --max_lr 1e-3 \
+  --weight_decay 1e-5 \
+  --pct_start 0.3 --div_factor 25 --final_div_factor 10000 \
+  --loss focal_tversky --focal_alpha 0.6 --focal_gamma 2.0 \
+  --tversky_alpha 0.4 --tversky_beta 0.6 \
+  --amp --save_dir outputs/run_01
+```
+
+**Paper results:**  
+- Accuracy: 89.55%  
+- Precision: 0.6741  
+- Recall: 0.6381  
+- F1: 0.6556  
+- IoU: 0.4876  
+- Dice: 0.6556
+
+---
+
+## Inference & visualization
+
+```bash
+python infer.py \
+  --scene_path data/raw/S1_scene.tif \
+  --model_ckpt outputs/run_01/best.ckpt \
+  --bands VV,VH,RATIO \
+  --tile_size 382 --overlap 32 \
+  --threshold 0.5 \
+  --out_raster outputs/run_01/pred_illegal_logging.tif
+```
+
+Use `scripts/visualize.py` to overlay predictions on SAR inputs.
+
+---
+
+## Reproducibility & deployment
+
+- **Seeds:** Set for Python, NumPy, Torch  
+- **Logging:** Save config, commit hash, environment info  
+- **Docker:** Build with CUDA runtime + dependencies for cloud portability  
+- **Optional:** Deploy as a Gradio app on Hugging Face Spaces  
+
+---
+
+## Acknowledgments
+
+This project is based on the research presented in:
+
+- **Thinh Ha** – Beaver Works Summer Institute, Anaheim Discovery Christian School  
+- **Tanish Khanna** – Beaver Works Summer Institute, La Jolla Country Day School  
+- **Naga Kasam** – Beaver Works Summer Institute, Dr. Ronald E McNair Academic High School  
+- **Arush Shangari** – Beaver Works Summer Institute, St. John's Preparatory School  
+- **Ruhaan Arya** – Beaver Works Summer Institute, The Village School  
+- **Ikshit Gupta** – Beaver Works Summer Institute, Mountain House High School  
+
+Special thanks to Mr. Scheele (MIT Lincoln Lab), Mr. Amriche (SUNY), and Dr. Xiao (MIT Lincoln Lab) for their guidance, and to the Sentinel‑1/Copernicus program for providing SAR data.
